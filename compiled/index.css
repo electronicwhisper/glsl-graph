@@ -1,0 +1,27 @@
+html,
+body {
+  margin: 0;
+}
+[contenteditable]:active,
+[contenteditable]:focus,
+button:active,
+button:focus {
+  outline: none;
+}
+[contenteditable] {
+  cursor: text;
+}
+body {
+  font-family: "Lucida Sans Unicode", "Lucida Grande", sans-serif;
+  font-size: 12px;
+  cursor: default;
+  overflow: hidden;
+  color: #333;
+}
+.Code {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 600px;
+  bottom: 0;
+}
