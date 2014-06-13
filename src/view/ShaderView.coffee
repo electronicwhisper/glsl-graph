@@ -14,24 +14,27 @@ colorMap.vertex = """
 precision highp float;
 precision highp int;
 
-attribute vec4 vertexPosition;
-varying vec2 position;
+attribute vec4 gg_vertexPosition;
+uniform vec2 gg_translate;
+uniform vec2 gg_scale;
+varying vec2 gg_position;
 
 void main() {
-  gl_Position = vec4(vertexPosition);
-  position = (vertexPosition.xy + 1.0) * 0.5;
+  gl_Position = vec4(gg_vertexPosition);
+
+  gg_position = gg_vertexPosition.xy * gg_scale + gg_translate;
 }
 """
 colorMap.fragment = """
 precision highp float;
 precision highp int;
 
-varying vec2 position;
+varying vec2 gg_position;
 
 // INSERT
 
 void main() {
-  gl_FragColor = draw(position);
+  gl_FragColor = draw(gg_position);
 }
 """
 
@@ -39,6 +42,8 @@ void main() {
 R.create "ShaderView",
   propTypes:
     src: String
+    center: Array
+    pixelSize: Number
 
   render: ->
     R.canvas {}
@@ -51,7 +56,7 @@ R.create "ShaderView",
     @_draw()
 
   shouldComponentUpdate: (nextProps) ->
-    @src != nextProps.src
+    !_.isEqual(@props, nextProps)
 
   _init: ->
     canvas = @getDOMNode()
@@ -77,9 +82,18 @@ R.create "ShaderView",
     try
       createProgramFromSrc(@_glod, "program", vertex, fragment)
 
+    canvas = @getDOMNode()
+    width = canvas.width
+    height = canvas.height
+
+    translate = @center
+    scale = [(width/2) * @pixelSize, (height/2) * @pixelSize]
+
     @_glod
       .begin("program")
-      .pack("quad", "vertexPosition")
+      .pack("quad", "gg_vertexPosition")
+      .valuev("gg_translate", translate)
+      .valuev("gg_scale", scale)
       .ready().triangles().drawArrays(0, 6)
       .end()
 
