@@ -47,7 +47,7 @@ require("./bootstrap");
 
 
 },{"./bootstrap":1,"./config":2,"./view/R":8}],4:[function(require,module,exports){
-var initialSrc, model;
+var initialSrc, model, startDrag;
 
 initialSrc = "vec4 draw(vec2 p) {\n  return vec4(p.x, p.y, 0., 1.);\n}";
 
@@ -60,7 +60,8 @@ model = {
 R.create("AppRootView", {
   render: function() {
     return R.div({}, R.div({
-      className: "Shader"
+      className: "Shader",
+      onMouseDown: this._startPan
     }, R.ShaderView({
       src: model.src,
       center: model.center,
@@ -78,8 +79,37 @@ R.create("AppRootView", {
   _codeChange: function(newValue) {
     model.src = newValue;
     return refresh();
+  },
+  _startPan: function(e) {
+    var lastX, lastY;
+    e.preventDefault();
+    lastX = e.clientX;
+    lastY = e.clientY;
+    return startDrag((function(_this) {
+      return function(e) {
+        var x, y;
+        x = e.clientX;
+        y = e.clientY;
+        model.center = [model.center[0] - (x - lastX) * model.pixelSize, model.center[1] + (y - lastY) * model.pixelSize];
+        lastX = x;
+        return lastY = y;
+      };
+    })(this));
   }
 });
+
+startDrag = function(callback) {
+  var move, up;
+  move = function(e) {
+    return callback(e);
+  };
+  up = function(e) {
+    document.removeEventListener("mousemove", move);
+    return document.removeEventListener("mouseup", up);
+  };
+  document.addEventListener("mousemove", move);
+  return document.addEventListener("mouseup", up);
+};
 
 
 },{}],5:[function(require,module,exports){
