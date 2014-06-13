@@ -1376,7 +1376,7 @@ require("./GridView");
 
 
 },{"./AppRootView":4,"./CodeMirrorView":5,"./GridView":7,"./ShaderView":9}],9:[function(require,module,exports){
-var Glod, bufferCartesianSamples, bufferQuad, cartesian, colorMap, createProgramFromSrc;
+var Glod, bufferCartesianSamples, bufferQuad, cartesian, colorMap, createProgramFromSrc, getTypeOfDraw;
 
 Glod = require("./Glod");
 
@@ -1406,11 +1406,24 @@ bufferCartesianSamples = function(glod, numSamples) {
   return glod.createVBO("samples").bufferDataStatic("samples", new Float32Array(samplesArray));
 };
 
+getTypeOfDraw = function(src) {
+  var matches, regex;
+  regex = /(float|vec2|vec3|vec4) +draw *\( *(float|vec2|vec3|vec4)/;
+  matches = regex.exec(src);
+  if (matches == null) {
+    return null;
+  }
+  return {
+    outputType: matches[1],
+    inputType: matches[2]
+  };
+};
+
 cartesian = {};
 
 cartesian.vertex = "precision highp float;\nprecision highp int;\n\nattribute float gg_sample;\n\nuniform float gg_start, gg_step;\nuniform vec2 gg_translate;\nuniform vec2 gg_scale;\n\n// INSERT\n\nvoid main() {\n  float x = gg_start + gg_step * gg_sample;\n  float y = draw(x);\n\n  vec2 position = (vec2(x, y) - gg_translate) / gg_scale;\n  gl_Position = vec4(position, 0., 1.);\n}";
 
-cartesian.fragment = "precision highp float;\nprecision highp int;\n\nvoid main() {\n  gl_FragColor = vec4(0., 0., 0., 1.);\n}";
+cartesian.fragment = "precision highp float;\nprecision highp int;\n\nvoid main() {\n  gl_FragColor = vec4(0., 0., 0.3, 1.);\n}";
 
 colorMap = {};
 
@@ -1438,7 +1451,7 @@ R.create("ShaderView", {
     return !_.isEqual(this.props, nextProps);
   },
   _init: function() {
-    var canvas, rect;
+    var canvas, gl, rect;
     canvas = this.getDOMNode();
     rect = canvas.getBoundingClientRect();
     canvas.width = rect.width;
@@ -1447,11 +1460,23 @@ R.create("ShaderView", {
     this._glod.canvas(canvas, {
       antialias: true
     });
+    gl = this._glod.gl();
+    gl.enable(gl.SCISSOR_TEST);
+    gl.lineWidth(1.25);
     bufferQuad(this._glod);
     return bufferCartesianSamples(this._glod, 20000);
   },
   _draw: function() {
-    return this._drawCartesian();
+    var type;
+    type = getTypeOfDraw(this.src);
+    if (type == null) {
+      return;
+    }
+    if (type.inputType === "float" && type.outputType === "float") {
+      return this._drawCartesian();
+    } else if (type.inputType === "vec2" && type.outputType === "vec4") {
+      return this._drawColorMap();
+    }
   },
   _drawColorMap: function() {
     var canvas, fragment, height, scale, translate, vertex, width;

@@ -1,0 +1,6 @@
+fix resizing canvas
+mark compile errors on code
+show/hide/resize code area
+save state to local storage
+save state with URL hash
+add time and other uniforms

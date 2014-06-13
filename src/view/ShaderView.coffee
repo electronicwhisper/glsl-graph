@@ -23,6 +23,16 @@ bufferCartesianSamples = (glod, numSamples) ->
     .createVBO("samples")
     .bufferDataStatic("samples", new Float32Array(samplesArray))
 
+getTypeOfDraw = (src) ->
+  regex = /(float|vec2|vec3|vec4) +draw *\( *(float|vec2|vec3|vec4)/
+  matches = regex.exec(src)
+  return null unless matches?
+  return {
+    outputType: matches[1]
+    inputType: matches[2]
+  }
+
+
 
 
 cartesian = {}
@@ -51,7 +61,7 @@ precision highp float;
 precision highp int;
 
 void main() {
-  gl_FragColor = vec4(0., 0., 0., 1.);
+  gl_FragColor = vec4(0., 0., 0.3, 1.);
 }
 """
 
@@ -120,13 +130,21 @@ R.create "ShaderView",
     @_glod = new Glod()
     @_glod.canvas(canvas, {antialias: true})
 
+    gl = @_glod.gl()
+    gl.enable(gl.SCISSOR_TEST)
+    gl.lineWidth(1.25)
+
     # Buffer
     bufferQuad(@_glod)
     bufferCartesianSamples(@_glod, 20000)
 
   _draw: ->
-    # @_drawColorMap()
-    @_drawCartesian()
+    type = getTypeOfDraw(@src)
+    return unless type?
+    if type.inputType == "float" and type.outputType == "float"
+      @_drawCartesian()
+    else if type.inputType == "vec2" and type.outputType == "vec4"
+      @_drawColorMap()
 
   _drawColorMap: ->
     vertex = colorMap.vertex
