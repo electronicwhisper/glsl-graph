@@ -117,3 +117,4 @@ R.create = (name, opts) ->
 
 require("./AppRootView")
 require("./CodeMirrorView")
+require("./ShaderView")
