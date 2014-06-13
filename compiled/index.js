@@ -61,7 +61,8 @@ R.create("AppRootView", {
   render: function() {
     return R.div({}, R.div({
       className: "Shader",
-      onMouseDown: this._startPan
+      onMouseDown: this._startPan,
+      onWheel: this._onWheel
     }, R.ShaderView({
       src: model.src,
       center: model.center,
@@ -95,6 +96,22 @@ R.create("AppRootView", {
         return lastY = y;
       };
     })(this));
+  },
+  _onWheel: function(e) {
+    var offset, rect, scaleFactor, zoomCenter;
+    e.preventDefault();
+    if (Math.abs(e.deltaY) <= 1) {
+      return;
+    }
+    scaleFactor = 1.1;
+    if (e.deltaY < 0) {
+      scaleFactor = 1 / scaleFactor;
+    }
+    rect = e.target.getBoundingClientRect();
+    zoomCenter = [model.center[0] + (e.clientX - (rect.left + rect.width / 2)) * model.pixelSize, model.center[1] - (e.clientY - (rect.top + rect.height / 2)) * model.pixelSize];
+    offset = numeric.sub(model.center, zoomCenter);
+    model.center = numeric.add(zoomCenter, numeric.mul(offset, scaleFactor));
+    return model.pixelSize *= scaleFactor;
   }
 });
 

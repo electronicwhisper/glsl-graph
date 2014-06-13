@@ -21,7 +21,7 @@ model = {
 R.create "AppRootView",
   render: ->
     R.div {},
-      R.div {className: "Shader", onMouseDown: @_startPan},
+      R.div {className: "Shader", onMouseDown: @_startPan, onWheel: @_onWheel},
         R.ShaderView {
           src: model.src
           center: model.center
@@ -56,7 +56,26 @@ R.create "AppRootView",
       lastX = x
       lastY = y
 
+  _onWheel: (e) ->
+    e.preventDefault()
 
+    return if Math.abs(e.deltaY) <= 1
+    scaleFactor = 1.1
+    scaleFactor = 1 / scaleFactor if e.deltaY < 0
+
+    rect = e.target.getBoundingClientRect()
+    zoomCenter = [
+      model.center[0] + (e.clientX - (rect.left + rect.width / 2)) * model.pixelSize
+      model.center[1] - (e.clientY - (rect.top + rect.height / 2)) * model.pixelSize
+    ]
+
+    offset = numeric.sub(model.center, zoomCenter)
+    model.center = numeric.add(
+      zoomCenter
+      numeric.mul(offset, scaleFactor)
+    )
+
+    model.pixelSize *= scaleFactor
 
 
 
