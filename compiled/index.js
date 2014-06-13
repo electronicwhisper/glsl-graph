@@ -49,7 +49,7 @@ require("./bootstrap");
 },{"./bootstrap":1,"./config":2,"./view/R":8}],4:[function(require,module,exports){
 var initialSrc, model, startDrag;
 
-initialSrc = "vec4 draw(vec2 p) {\n  return vec4(p.x, p.y, 0., 1.);\n}";
+initialSrc = "float draw(float x) {\n  return fract(x);\n}";
 
 model = {
   src: initialSrc,
@@ -1376,7 +1376,7 @@ require("./GridView");
 
 
 },{"./AppRootView":4,"./CodeMirrorView":5,"./GridView":7,"./ShaderView":9}],9:[function(require,module,exports){
-var Glod, colorMap, createProgramFromSrc;
+var Glod, bufferCartesianSamples, bufferQuad, cartesian, colorMap, createProgramFromSrc;
 
 Glod = require("./Glod");
 
@@ -1389,6 +1389,28 @@ createProgramFromSrc = function(glod, name, vertex, fragment) {
   delete glod._programs[name];
   return glod.createProgram(name);
 };
+
+bufferQuad = function(glod) {
+  return glod.createVBO("quad").uploadCCWQuad("quad");
+};
+
+bufferCartesianSamples = function(glod, numSamples) {
+  var i, samplesArray, _i;
+  samplesArray = [];
+  for (i = _i = 0; 0 <= numSamples ? _i <= numSamples : _i >= numSamples; i = 0 <= numSamples ? ++_i : --_i) {
+    samplesArray.push(i);
+  }
+  if (glod.hasVBO("samples")) {
+    glod.deleteVBO("samples");
+  }
+  return glod.createVBO("samples").bufferDataStatic("samples", new Float32Array(samplesArray));
+};
+
+cartesian = {};
+
+cartesian.vertex = "precision highp float;\nprecision highp int;\n\nattribute float gg_sample;\n\nuniform float gg_start, gg_step;\nuniform vec2 gg_translate;\nuniform vec2 gg_scale;\n\n// INSERT\n\nvoid main() {\n  float x = gg_start + gg_step * gg_sample;\n  float y = draw(x);\n\n  vec2 position = (vec2(x, y) - gg_translate) / gg_scale;\n  gl_Position = vec4(position, 0., 1.);\n}";
+
+cartesian.fragment = "precision highp float;\nprecision highp int;\n\nvoid main() {\n  gl_FragColor = vec4(0., 0., 0., 1.);\n}";
 
 colorMap = {};
 
@@ -1425,21 +1447,47 @@ R.create("ShaderView", {
     this._glod.canvas(canvas, {
       antialias: true
     });
-    return this._glod.createVBO("quad").uploadCCWQuad("quad");
+    bufferQuad(this._glod);
+    return bufferCartesianSamples(this._glod, 20000);
   },
   _draw: function() {
+    return this._drawCartesian();
+  },
+  _drawColorMap: function() {
     var canvas, fragment, height, scale, translate, vertex, width;
     vertex = colorMap.vertex;
     fragment = colorMap.fragment.replace("// INSERT", this.src);
-    try {
-      createProgramFromSrc(this._glod, "program", vertex, fragment);
-    } catch (_error) {}
+    this._createProgram(vertex, fragment);
     canvas = this.getDOMNode();
     width = canvas.width;
     height = canvas.height;
     translate = this.center;
     scale = [(width / 2) * this.pixelSize, (height / 2) * this.pixelSize];
     return this._glod.begin("program").pack("quad", "gg_vertexPosition").valuev("gg_translate", translate).valuev("gg_scale", scale).ready().triangles().drawArrays(0, 6).end();
+  },
+  _drawCartesian: function() {
+    var canvas, fragment, height, numSamples, scale, start, step, translate, vertex, width;
+    vertex = cartesian.vertex.replace("// INSERT", this.src);
+    fragment = cartesian.fragment;
+    this._createProgram(vertex, fragment);
+    canvas = this.getDOMNode();
+    width = canvas.width;
+    height = canvas.height;
+    translate = this.center;
+    scale = [(width / 2) * this.pixelSize, (height / 2) * this.pixelSize];
+    start = this.center[0] - (width / 2) * this.pixelSize;
+    step = this.pixelSize * config.resolution;
+    numSamples = width / config.resolution;
+    return this._glod.begin("program").pack("samples", "gg_sample").valuev("gg_translate", translate).valuev("gg_scale", scale).value("gg_start", start).value("gg_step", step).ready().lineStrip().drawArrays(0, numSamples).end();
+  },
+  _createProgram: function(vertex, fragment) {
+    if (vertex !== this._lastVertex || fragment !== this._lastFragment) {
+      try {
+        createProgramFromSrc(this._glod, "program", vertex, fragment);
+      } catch (_error) {}
+      this._lastVertex = vertex;
+      return this._lastFragment = fragment;
+    }
   }
 });
 

@@ -1,6 +1,11 @@
+# initialSrc = """
+# vec4 draw(vec2 p) {
+#   return vec4(p.x, p.y, 0., 1.);
+# }
+# """
 initialSrc = """
-vec4 draw(vec2 p) {
-  return vec4(p.x, p.y, 0., 1.);
+float draw(float x) {
+  return fract(x);
 }
 """
 
