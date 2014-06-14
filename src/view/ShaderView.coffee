@@ -1,4 +1,5 @@
 Glod = require("./Glod")
+glslParseError = require("./glsl/glslParseError")
 
 createProgramFromSrc = (glod, name, vertex, fragment) ->
   Glod.preprocessed[name] = {name, fragment, vertex}
@@ -32,7 +33,9 @@ getTypeOfDraw = (src) ->
     inputType: matches[2]
   }
 
-
+stringIndexToLineNum = (str, index) ->
+  return 0 if index <= 0
+  str.slice(0, index + 1).trimRight().split("\n").length;
 
 
 cartesian = {}
@@ -148,7 +151,7 @@ R.create "ShaderView",
 
   _drawColorMap: ->
     vertex = colorMap.vertex
-    fragment = colorMap.fragment.replace("// INSERT", @src)
+    fragment = colorMap.fragment
 
     @_createProgram(vertex, fragment)
 
@@ -168,7 +171,7 @@ R.create "ShaderView",
       .end()
 
   _drawCartesian: ->
-    vertex = cartesian.vertex.replace("// INSERT", @src)
+    vertex = cartesian.vertex
     fragment = cartesian.fragment
 
     @_createProgram(vertex, fragment)
@@ -194,10 +197,25 @@ R.create "ShaderView",
       .ready().lineStrip().drawArrays(0, numSamples)
       .end()
 
-  _createProgram: (vertex, fragment) ->
+  _createProgram: (vertexSrc, fragmentSrc) ->
+    vertex = vertexSrc.replace("// INSERT", @src)
+    fragment = fragmentSrc.replace("// INSERT", @src)
+
     if vertex != @_lastVertex or fragment != @_lastFragment
       try
         createProgramFromSrc(@_glod, "program", vertex, fragment)
+      catch err
+        if err.data
+          errors = glslParseError(err.data)
+          if index = vertexSrc.indexOf("// INSERT")
+            lineOffset = stringIndexToLineNum(vertexSrc, index)
+          else if index = fragmentSrc.indexOf("// INSERT")
+            lineOffset = stringIndexToLineNum(fragmentSrc, index)
+          for error in errors
+            error.line -= lineOffset
+
+          console.log errors
+
       @_lastVertex = vertex
       @_lastFragment = fragment
 

@@ -1376,9 +1376,11 @@ require("./GridView");
 
 
 },{"./AppRootView":4,"./CodeMirrorView":5,"./GridView":7,"./ShaderView":9}],9:[function(require,module,exports){
-var Glod, bufferCartesianSamples, bufferQuad, cartesian, colorMap, createProgramFromSrc, getTypeOfDraw;
+var Glod, bufferCartesianSamples, bufferQuad, cartesian, colorMap, createProgramFromSrc, getTypeOfDraw, glslParseError, stringIndexToLineNum;
 
 Glod = require("./Glod");
+
+glslParseError = require("./glsl/glslParseError");
 
 createProgramFromSrc = function(glod, name, vertex, fragment) {
   Glod.preprocessed[name] = {
@@ -1417,6 +1419,13 @@ getTypeOfDraw = function(src) {
     outputType: matches[1],
     inputType: matches[2]
   };
+};
+
+stringIndexToLineNum = function(str, index) {
+  if (index <= 0) {
+    return 0;
+  }
+  return str.slice(0, index + 1).trimRight().split("\n").length;
 };
 
 cartesian = {};
@@ -1481,7 +1490,7 @@ R.create("ShaderView", {
   _drawColorMap: function() {
     var canvas, fragment, height, scale, translate, vertex, width;
     vertex = colorMap.vertex;
-    fragment = colorMap.fragment.replace("// INSERT", this.src);
+    fragment = colorMap.fragment;
     this._createProgram(vertex, fragment);
     canvas = this.getDOMNode();
     width = canvas.width;
@@ -1492,7 +1501,7 @@ R.create("ShaderView", {
   },
   _drawCartesian: function() {
     var canvas, fragment, height, numSamples, scale, start, step, translate, vertex, width;
-    vertex = cartesian.vertex.replace("// INSERT", this.src);
+    vertex = cartesian.vertex;
     fragment = cartesian.fragment;
     this._createProgram(vertex, fragment);
     canvas = this.getDOMNode();
@@ -1505,11 +1514,29 @@ R.create("ShaderView", {
     numSamples = width / config.resolution;
     return this._glod.begin("program").pack("samples", "gg_sample").valuev("gg_translate", translate).valuev("gg_scale", scale).value("gg_start", start).value("gg_step", step).ready().lineStrip().drawArrays(0, numSamples).end();
   },
-  _createProgram: function(vertex, fragment) {
+  _createProgram: function(vertexSrc, fragmentSrc) {
+    var err, error, errors, fragment, index, lineOffset, vertex, _i, _len;
+    vertex = vertexSrc.replace("// INSERT", this.src);
+    fragment = fragmentSrc.replace("// INSERT", this.src);
     if (vertex !== this._lastVertex || fragment !== this._lastFragment) {
       try {
         createProgramFromSrc(this._glod, "program", vertex, fragment);
-      } catch (_error) {}
+      } catch (_error) {
+        err = _error;
+        if (err.data) {
+          errors = glslParseError(err.data);
+          if (index = vertexSrc.indexOf("// INSERT")) {
+            lineOffset = stringIndexToLineNum(vertexSrc, index);
+          } else if (index = fragmentSrc.indexOf("// INSERT")) {
+            lineOffset = stringIndexToLineNum(fragmentSrc, index);
+          }
+          for (_i = 0, _len = errors.length; _i < _len; _i++) {
+            error = errors[_i];
+            error.line -= lineOffset;
+          }
+          console.log(errors);
+        }
+      }
       this._lastVertex = vertex;
       return this._lastFragment = fragment;
     }
@@ -1517,4 +1544,21 @@ R.create("ShaderView", {
 });
 
 
-},{"./Glod":6}]},{},[3])
+},{"./Glod":6,"./glsl/glslParseError":10}],10:[function(require,module,exports){
+var errorRegex = /ERROR: *(\d+):(\d+):(.*)/;
+
+module.exports = function glslParseError(err) {
+  var lines = err.toString().split('\n');
+  var errors = [];
+  lines.forEach(function(line) {
+    var match = errorRegex.exec(line);
+    if (match) {
+      errors.push({
+        line:    parseInt(match[2], 10),
+        message: match[3].trim()
+      });
+    }
+  });
+  return errors;
+};
+},{}]},{},[3])
