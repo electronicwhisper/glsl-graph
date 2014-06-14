@@ -1,5 +1,5 @@
 Glod = require("./Glod")
-glslParseError = require("./glsl/glslParseError")
+
 
 createProgramFromSrc = (glod, name, vertex, fragment) ->
   Glod.preprocessed[name] = {name, fragment, vertex}
@@ -32,10 +32,6 @@ getTypeOfDraw = (src) ->
     outputType: matches[1]
     inputType: matches[2]
   }
-
-stringIndexToLineNum = (str, index) ->
-  return 0 if index <= 0
-  str.slice(0, index + 1).trimRight().split("\n").length;
 
 
 cartesian = {}
@@ -142,6 +138,7 @@ R.create "ShaderView",
     bufferCartesianSamples(@_glod, 20000)
 
   _draw: ->
+    return if @errors.length > 0
     type = getTypeOfDraw(@src)
     return unless type?
     if type.inputType == "float" and type.outputType == "float"
@@ -202,19 +199,7 @@ R.create "ShaderView",
     fragment = fragmentSrc.replace("// INSERT", @src)
 
     if vertex != @_lastVertex or fragment != @_lastFragment
-      try
-        createProgramFromSrc(@_glod, "program", vertex, fragment)
-      catch err
-        if err.data
-          errors = glslParseError(err.data)
-          if index = vertexSrc.indexOf("// INSERT")
-            lineOffset = stringIndexToLineNum(vertexSrc, index)
-          else if index = fragmentSrc.indexOf("// INSERT")
-            lineOffset = stringIndexToLineNum(fragmentSrc, index)
-          for error in errors
-            error.line -= lineOffset
-
-          console.log errors
+      createProgramFromSrc(@_glod, "program", vertex, fragment)
 
       @_lastVertex = vertex
       @_lastFragment = fragment

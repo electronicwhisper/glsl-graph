@@ -32,7 +32,7 @@ void main() {
 }
 """
 
-module.exports = checkError = (src) ->
+module.exports = glslCheckError = (src) ->
   fragment = fragmentSrc.replace("// INSERT", src)
 
   try
@@ -40,7 +40,7 @@ module.exports = checkError = (src) ->
   catch err
     if err.data
       errors = glslParseError(err.data)
-      lineOffset = 3
+      lineOffset = 4
       for error in errors
         error.line -= lineOffset
 

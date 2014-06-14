@@ -47,12 +47,15 @@ require("./bootstrap");
 
 
 },{"./bootstrap":1,"./config":2,"./view/R":8}],4:[function(require,module,exports){
-var initialSrc, model, startDrag;
+var glslCheckError, initialSrc, model, startDrag;
+
+glslCheckError = require("./glsl/glslCheckError");
 
 initialSrc = "float draw(float x) {\n  return fract(x);\n}";
 
 model = {
   src: initialSrc,
+  errors: [],
   center: [0, 0],
   pixelSize: .01
 };
@@ -65,6 +68,7 @@ R.create("AppRootView", {
       onWheel: this._onWheel
     }, R.ShaderView({
       src: model.src,
+      errors: model.errors,
       center: model.center,
       pixelSize: model.pixelSize
     }), R.GridView({
@@ -74,11 +78,13 @@ R.create("AppRootView", {
       className: "Code"
     }, R.CodeMirrorView({
       value: model.src,
+      errors: model.errors,
       onChange: this._codeChange
     })));
   },
   _codeChange: function(newValue) {
     model.src = newValue;
+    model.errors = glslCheckError(model.src);
     return refresh();
   },
   _startPan: function(e) {
@@ -129,10 +135,11 @@ startDrag = function(callback) {
 };
 
 
-},{}],5:[function(require,module,exports){
+},{"./glsl/glslCheckError":10}],5:[function(require,module,exports){
 R.create("CodeMirrorView", {
   propTypes: {
     value: String,
+    errors: Array,
     onChange: Function
   },
   render: function() {
@@ -156,9 +163,20 @@ R.create("CodeMirrorView", {
     return this._cm.on("change", this._onChange);
   },
   _update: function() {
+    var error, line, _i, _j, _len, _ref, _ref1, _results;
     if (this._cm.getValue() !== this.value) {
-      return this._cm.setValue(this.value);
+      this._cm.setValue(this.value);
     }
+    for (line = _i = 0, _ref = this._cm.lineCount(); 0 <= _ref ? _i < _ref : _i > _ref; line = 0 <= _ref ? ++_i : --_i) {
+      this._cm.removeLineClass(line, "wrap");
+    }
+    _ref1 = this.errors;
+    _results = [];
+    for (_j = 0, _len = _ref1.length; _j < _len; _j++) {
+      error = _ref1[_j];
+      _results.push(this._cm.addLineClass(error.line, "wrap", "LineError"));
+    }
+    return _results;
   },
   _onChange: function() {
     var newValue;
@@ -1376,11 +1394,9 @@ require("./GridView");
 
 
 },{"./AppRootView":4,"./CodeMirrorView":5,"./GridView":7,"./ShaderView":9}],9:[function(require,module,exports){
-var Glod, bufferCartesianSamples, bufferQuad, cartesian, colorMap, createProgramFromSrc, getTypeOfDraw, glslParseError, stringIndexToLineNum;
+var Glod, bufferCartesianSamples, bufferQuad, cartesian, colorMap, createProgramFromSrc, getTypeOfDraw;
 
 Glod = require("./Glod");
-
-glslParseError = require("./glsl/glslParseError");
 
 createProgramFromSrc = function(glod, name, vertex, fragment) {
   Glod.preprocessed[name] = {
@@ -1419,13 +1435,6 @@ getTypeOfDraw = function(src) {
     outputType: matches[1],
     inputType: matches[2]
   };
-};
-
-stringIndexToLineNum = function(str, index) {
-  if (index <= 0) {
-    return 0;
-  }
-  return str.slice(0, index + 1).trimRight().split("\n").length;
 };
 
 cartesian = {};
@@ -1477,6 +1486,9 @@ R.create("ShaderView", {
   },
   _draw: function() {
     var type;
+    if (this.errors.length > 0) {
+      return;
+    }
     type = getTypeOfDraw(this.src);
     if (type == null) {
       return;
@@ -1515,28 +1527,11 @@ R.create("ShaderView", {
     return this._glod.begin("program").pack("samples", "gg_sample").valuev("gg_translate", translate).valuev("gg_scale", scale).value("gg_start", start).value("gg_step", step).ready().lineStrip().drawArrays(0, numSamples).end();
   },
   _createProgram: function(vertexSrc, fragmentSrc) {
-    var err, error, errors, fragment, index, lineOffset, vertex, _i, _len;
+    var fragment, vertex;
     vertex = vertexSrc.replace("// INSERT", this.src);
     fragment = fragmentSrc.replace("// INSERT", this.src);
     if (vertex !== this._lastVertex || fragment !== this._lastFragment) {
-      try {
-        createProgramFromSrc(this._glod, "program", vertex, fragment);
-      } catch (_error) {
-        err = _error;
-        if (err.data) {
-          errors = glslParseError(err.data);
-          if (index = vertexSrc.indexOf("// INSERT")) {
-            lineOffset = stringIndexToLineNum(vertexSrc, index);
-          } else if (index = fragmentSrc.indexOf("// INSERT")) {
-            lineOffset = stringIndexToLineNum(fragmentSrc, index);
-          }
-          for (_i = 0, _len = errors.length; _i < _len; _i++) {
-            error = errors[_i];
-            error.line -= lineOffset;
-          }
-          console.log(errors);
-        }
-      }
+      createProgramFromSrc(this._glod, "program", vertex, fragment);
       this._lastVertex = vertex;
       return this._lastFragment = fragment;
     }
@@ -1544,7 +1539,55 @@ R.create("ShaderView", {
 });
 
 
-},{"./Glod":6,"./glsl/glslParseError":10}],10:[function(require,module,exports){
+},{"./Glod":6}],10:[function(require,module,exports){
+var Glod, canvas, createProgramFromSrc, fragmentSrc, glod, glslCheckError, glslParseError, vertexSrc;
+
+Glod = require("../Glod");
+
+glslParseError = require("./glslParseError");
+
+createProgramFromSrc = function(glod, name, vertex, fragment) {
+  Glod.preprocessed[name] = {
+    name: name,
+    fragment: fragment,
+    vertex: vertex
+  };
+  delete glod._programs[name];
+  return glod.createProgram(name);
+};
+
+canvas = document.createElement("canvas");
+
+glod = new Glod();
+
+glod.canvas(canvas);
+
+vertexSrc = "precision highp float;\nprecision highp int;\n\nvoid main() {\n  gl_Position = vec4(0., 0., 0., 1.);\n}";
+
+fragmentSrc = "precision highp float;\nprecision highp int;\n\n// INSERT\n\nvoid main() {\n  gl_FragColor = vec4(0., 0., 0., 1.);\n}";
+
+module.exports = glslCheckError = function(src) {
+  var err, error, errors, fragment, lineOffset, _i, _len;
+  fragment = fragmentSrc.replace("// INSERT", src);
+  try {
+    createProgramFromSrc(glod, "tester", vertexSrc, fragment);
+  } catch (_error) {
+    err = _error;
+    if (err.data) {
+      errors = glslParseError(err.data);
+      lineOffset = 4;
+      for (_i = 0, _len = errors.length; _i < _len; _i++) {
+        error = errors[_i];
+        error.line -= lineOffset;
+      }
+      return errors;
+    }
+  }
+  return [];
+};
+
+
+},{"../Glod":6,"./glslParseError":11}],11:[function(require,module,exports){
 var errorRegex = /ERROR: *(\d+):(\d+):(.*)/;
 
 module.exports = function glslParseError(err) {

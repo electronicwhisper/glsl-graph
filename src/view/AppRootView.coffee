@@ -1,3 +1,9 @@
+glslCheckError = require("./glsl/glslCheckError")
+
+
+
+
+
 # initialSrc = """
 # vec4 draw(vec2 p) {
 #   return vec4(p.x, p.y, 0., 1.);
@@ -13,6 +19,7 @@ float draw(float x) {
 
 model = {
   src: initialSrc
+  errors: []
   center: [0, 0]
   pixelSize: .01
 }
@@ -29,6 +36,7 @@ R.create "AppRootView",
       R.div {className: "Shader", onMouseDown: @_startPan, onWheel: @_onWheel},
         R.ShaderView {
           src: model.src
+          errors: model.errors
           center: model.center
           pixelSize: model.pixelSize
         }
@@ -39,11 +47,13 @@ R.create "AppRootView",
       R.div {className: "Code"},
         R.CodeMirrorView {
           value: model.src
+          errors: model.errors
           onChange: @_codeChange
         }
 
   _codeChange: (newValue) ->
     model.src = newValue
+    model.errors = glslCheckError(model.src)
     refresh()
 
   _startPan: (e) ->

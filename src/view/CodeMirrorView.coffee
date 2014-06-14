@@ -1,6 +1,7 @@
 R.create "CodeMirrorView",
   propTypes:
     value: String
+    errors: Array
     onChange: Function
 
   render: ->
@@ -21,6 +22,12 @@ R.create "CodeMirrorView",
   _update: ->
     if @_cm.getValue() != @value
       @_cm.setValue(@value)
+
+    for line in [0 ... @_cm.lineCount()]
+      @_cm.removeLineClass(line, "wrap")
+
+    for error in @errors
+      @_cm.addLineClass(error.line, "wrap", "LineError")
 
   _onChange: ->
     newValue = @_cm.getValue()
