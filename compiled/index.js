@@ -46,7 +46,7 @@ require("./view/R");
 require("./bootstrap");
 
 
-},{"./bootstrap":1,"./config":2,"./view/R":8}],4:[function(require,module,exports){
+},{"./bootstrap":1,"./config":2,"./view/R":7}],4:[function(require,module,exports){
 var glslCheckError, initialSrc, model, startDrag;
 
 glslCheckError = require("./glsl/glslCheckError");
@@ -193,6 +193,496 @@ R.create("CodeMirrorView", {
 
 
 },{}],6:[function(require,module,exports){
+var canvasBounds, clear, drawGrid, drawLine, getSpacing, lerp, ticks;
+
+R.create("GridView", {
+  propTypes: {
+    center: Array,
+    pixelSize: Number
+  },
+  render: function() {
+    return R.canvas({});
+  },
+  componentDidMount: function() {
+    return this._draw();
+  },
+  componentDidUpdate: function() {
+    return this._draw();
+  },
+  shouldComponentUpdate: function(nextProps) {
+    return !_.isEqual(this.props, nextProps);
+  },
+  _draw: function() {
+    var canvas, ctx, rect;
+    canvas = this.getDOMNode();
+    rect = canvas.getBoundingClientRect();
+    if (canvas.width !== rect.width || canvas.height !== rect.height) {
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+    }
+    ctx = canvas.getContext("2d");
+    clear(ctx);
+    return drawGrid(ctx, this.center, this.pixelSize);
+  }
+});
+
+clear = function(ctx) {
+  var canvas;
+  canvas = ctx.canvas;
+  return ctx.clearRect(0, 0, canvas.width, canvas.height);
+};
+
+canvasBounds = function(ctx) {
+  var canvas;
+  canvas = ctx.canvas;
+  return {
+    cxMin: 0,
+    cxMax: canvas.width,
+    cyMin: canvas.height,
+    cyMax: 0,
+    width: canvas.width,
+    height: canvas.height
+  };
+};
+
+lerp = function(x, dMin, dMax, rMin, rMax) {
+  var ratio;
+  ratio = (x - dMin) / (dMax - dMin);
+  return ratio * (rMax - rMin) + rMin;
+};
+
+ticks = function(spacing, min, max) {
+  var first, last, x, _i, _results;
+  first = Math.ceil(min / spacing);
+  last = Math.floor(max / spacing);
+  _results = [];
+  for (x = _i = first; first <= last ? _i <= last : _i >= last; x = first <= last ? ++_i : --_i) {
+    _results.push(x * spacing);
+  }
+  return _results;
+};
+
+drawLine = function(ctx, _arg, _arg1) {
+  var x1, x2, y1, y2;
+  x1 = _arg[0], y1 = _arg[1];
+  x2 = _arg1[0], y2 = _arg1[1];
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  return ctx.stroke();
+};
+
+getSpacing = function(pixelSize) {
+  var div, largeSpacing, minSpacing, smallSpacing, z;
+  minSpacing = pixelSize * config.minGridSpacing;
+
+  /*
+  need to determine:
+    largeSpacing = {1, 2, or 5} * 10^n
+    smallSpacing = divide largeSpacing by 4 (if 1 or 2) or 5 (if 5)
+  largeSpacing must be greater than minSpacing
+   */
+  div = 4;
+  largeSpacing = z = Math.pow(10, Math.ceil(Math.log(minSpacing) / Math.log(10)));
+  if (z / 5 > minSpacing) {
+    largeSpacing = z / 5;
+  } else if (z / 2 > minSpacing) {
+    largeSpacing = z / 2;
+    div = 5;
+  }
+  smallSpacing = largeSpacing / div;
+  return {
+    largeSpacing: largeSpacing,
+    smallSpacing: smallSpacing
+  };
+};
+
+drawGrid = function(ctx, center, pixelSize) {
+  var axesColor, axesOpacity, color, cx, cxMax, cxMin, cy, cyMax, cyMin, fromLocal, height, labelColor, labelDistance, labelOpacity, largeSpacing, majorColor, majorOpacity, minorColor, minorOpacity, smallSpacing, text, textHeight, toLocal, width, x, xMax, xMin, y, yMax, yMin, _i, _j, _k, _l, _len, _len1, _len2, _len3, _len4, _len5, _m, _n, _ref, _ref1, _ref10, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9;
+  _ref = canvasBounds(ctx), cxMin = _ref.cxMin, cxMax = _ref.cxMax, cyMin = _ref.cyMin, cyMax = _ref.cyMax, width = _ref.width, height = _ref.height;
+  xMin = center[0] - (width / 2) * pixelSize;
+  xMax = center[0] + (width / 2) * pixelSize;
+  yMin = center[1] - (height / 2) * pixelSize;
+  yMax = center[1] + (height / 2) * pixelSize;
+  _ref1 = canvasBounds(ctx), cxMin = _ref1.cxMin, cxMax = _ref1.cxMax, cyMin = _ref1.cyMin, cyMax = _ref1.cyMax, width = _ref1.width, height = _ref1.height;
+  _ref2 = getSpacing(pixelSize), largeSpacing = _ref2.largeSpacing, smallSpacing = _ref2.smallSpacing;
+  toLocal = function(_arg) {
+    var cx, cy;
+    cx = _arg[0], cy = _arg[1];
+    return [lerp(cx, cxMin, cxMax, xMin, xMax), lerp(cy, cyMin, cyMax, yMin, yMax)];
+  };
+  fromLocal = function(_arg) {
+    var x, y;
+    x = _arg[0], y = _arg[1];
+    return [lerp(x, xMin, xMax, cxMin, cxMax), lerp(y, yMin, yMax, cyMin, cyMax)];
+  };
+  labelDistance = 5;
+  color = config.gridColor;
+  minorOpacity = 0.075;
+  majorOpacity = 0.1;
+  axesOpacity = 0.25;
+  labelOpacity = 1.0;
+  textHeight = 12;
+  minorColor = "rgba(" + color + ", " + minorOpacity + ")";
+  majorColor = "rgba(" + color + ", " + majorOpacity + ")";
+  axesColor = "rgba(" + color + ", " + axesOpacity + ")";
+  labelColor = "rgba(" + color + ", " + labelOpacity + ")";
+  ctx.save();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = minorColor;
+  _ref3 = ticks(smallSpacing, xMin, xMax);
+  for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
+    x = _ref3[_i];
+    drawLine(ctx, fromLocal([x, yMin]), fromLocal([x, yMax]));
+  }
+  _ref4 = ticks(smallSpacing, yMin, yMax);
+  for (_j = 0, _len1 = _ref4.length; _j < _len1; _j++) {
+    y = _ref4[_j];
+    drawLine(ctx, fromLocal([xMin, y]), fromLocal([xMax, y]));
+  }
+  ctx.strokeStyle = majorColor;
+  _ref5 = ticks(largeSpacing, xMin, xMax);
+  for (_k = 0, _len2 = _ref5.length; _k < _len2; _k++) {
+    x = _ref5[_k];
+    drawLine(ctx, fromLocal([x, yMin]), fromLocal([x, yMax]));
+  }
+  _ref6 = ticks(largeSpacing, yMin, yMax);
+  for (_l = 0, _len3 = _ref6.length; _l < _len3; _l++) {
+    y = _ref6[_l];
+    drawLine(ctx, fromLocal([xMin, y]), fromLocal([xMax, y]));
+  }
+  ctx.strokeStyle = axesColor;
+  drawLine(ctx, fromLocal([0, yMin]), fromLocal([0, yMax]));
+  drawLine(ctx, fromLocal([xMin, 0]), fromLocal([xMax, 0]));
+  ctx.font = "" + textHeight + "px verdana";
+  ctx.fillStyle = labelColor;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  _ref7 = ticks(largeSpacing, xMin, xMax);
+  for (_m = 0, _len4 = _ref7.length; _m < _len4; _m++) {
+    x = _ref7[_m];
+    if (x !== 0) {
+      text = parseFloat(x.toPrecision(12)).toString();
+      _ref8 = fromLocal([x, 0]), cx = _ref8[0], cy = _ref8[1];
+      if (cx < cxMax) {
+        cy += labelDistance;
+        if (cy < labelDistance) {
+          cy = labelDistance;
+        }
+        if (cy + textHeight + labelDistance > height) {
+          cy = height - labelDistance - textHeight;
+        }
+        ctx.fillText(text, cx, cy);
+      }
+    }
+  }
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  _ref9 = ticks(largeSpacing, yMin, yMax);
+  for (_n = 0, _len5 = _ref9.length; _n < _len5; _n++) {
+    y = _ref9[_n];
+    if (y !== 0) {
+      text = parseFloat(y.toPrecision(12)).toString();
+      _ref10 = fromLocal([0, y]), cx = _ref10[0], cy = _ref10[1];
+      if (cy > 0) {
+        cx += labelDistance;
+        if (cx < labelDistance) {
+          cx = labelDistance;
+        }
+        if (cx + ctx.measureText(text).width + labelDistance > width) {
+          cx = width - labelDistance - ctx.measureText(text).width;
+        }
+        ctx.fillText(text, cx, cy);
+      }
+    }
+  }
+  return ctx.restore();
+};
+
+
+},{}],7:[function(require,module,exports){
+var R, desugarPropType, key, value, _ref,
+  __hasProp = {}.hasOwnProperty;
+
+window.R = R = {};
+
+_ref = React.DOM;
+for (key in _ref) {
+  if (!__hasProp.call(_ref, key)) continue;
+  value = _ref[key];
+  R[key] = value;
+}
+
+R.cx = React.addons.classSet;
+
+R.UniversalMixin = {
+  ownerView: function() {
+    var _ref1;
+    return (_ref1 = this._owner) != null ? _ref1 : this.props.__owner__;
+  },
+  lookup: function(keyName) {
+    var _ref1, _ref2;
+    return (_ref1 = this[keyName]) != null ? _ref1 : (_ref2 = this.ownerView()) != null ? _ref2.lookup(keyName) : void 0;
+  },
+  lookupView: function(viewName) {
+    var _ref1;
+    if (this === viewName || this.viewName() === viewName) {
+      return this;
+    }
+    return (_ref1 = this.ownerView()) != null ? _ref1.lookupView(viewName) : void 0;
+  },
+  lookupViewWithKey: function(keyName) {
+    var _ref1;
+    if (this[keyName] != null) {
+      return this;
+    }
+    return (_ref1 = this.ownerView()) != null ? _ref1.lookupViewWithKey(keyName) : void 0;
+  },
+  setPropsOnSelf: function(nextProps) {
+    var propName, propValue, _results;
+    _results = [];
+    for (propName in nextProps) {
+      if (!__hasProp.call(nextProps, propName)) continue;
+      propValue = nextProps[propName];
+      if (propName === "__owner__") {
+        continue;
+      }
+      _results.push(this[propName] = propValue);
+    }
+    return _results;
+  },
+  componentWillMount: function() {
+    return this.setPropsOnSelf(this.props);
+  },
+  componentWillUpdate: function(nextProps) {
+    return this.setPropsOnSelf(nextProps);
+  },
+  componentDidMount: function() {
+    var el;
+    el = this.getDOMNode();
+    return el.dataFor != null ? el.dataFor : el.dataFor = this;
+  },
+  componentWillUnmount: function() {
+    var el;
+    el = this.getDOMNode();
+    return delete el.dataFor;
+  }
+};
+
+desugarPropType = function(propType, optional) {
+  var required;
+  if (optional == null) {
+    optional = false;
+  }
+  if (propType.optional) {
+    propType = propType.optional;
+    required = false;
+  } else if (optional) {
+    required = false;
+  } else {
+    required = true;
+  }
+  if (propType === Number) {
+    propType = React.PropTypes.number;
+  } else if (propType === String) {
+    propType = React.PropTypes.string;
+  } else if (propType === Boolean) {
+    propType = React.PropTypes.bool;
+  } else if (propType === Function) {
+    propType = React.PropTypes.func;
+  } else if (propType === Array) {
+    propType = React.PropTypes.array;
+  } else if (propType === Object) {
+    propType = React.PropTypes.object;
+  } else if (_.isArray(propType)) {
+    propType = React.PropTypes.any;
+  } else {
+    propType = React.PropTypes.instanceOf(propType);
+  }
+  if (required) {
+    propType = propType.isRequired;
+  }
+  return propType;
+};
+
+R.create = function(name, opts) {
+  var propName, propType, _ref1;
+  opts.displayName = name;
+  opts.viewName = function() {
+    return name;
+  };
+  if (opts.propTypes == null) {
+    opts.propTypes = {};
+  }
+  _ref1 = opts.propTypes;
+  for (propName in _ref1) {
+    if (!__hasProp.call(_ref1, propName)) continue;
+    propType = _ref1[propName];
+    opts.propTypes[propName] = desugarPropType(propType);
+  }
+  if (opts.mixins == null) {
+    opts.mixins = [];
+  }
+  opts.mixins.unshift(R.UniversalMixin);
+  return R[name] = React.createClass(opts);
+};
+
+require("./AppRootView");
+
+require("./CodeMirrorView");
+
+require("./ShaderView");
+
+require("./GridView");
+
+
+},{"./AppRootView":4,"./CodeMirrorView":5,"./GridView":6,"./ShaderView":8}],8:[function(require,module,exports){
+var Glod, bufferCartesianSamples, bufferQuad, cartesian, colorMap, createProgramFromSrc, getTypeOfDraw;
+
+Glod = require("./glsl/Glod");
+
+createProgramFromSrc = function(glod, name, vertex, fragment) {
+  Glod.preprocessed[name] = {
+    name: name,
+    fragment: fragment,
+    vertex: vertex
+  };
+  delete glod._programs[name];
+  return glod.createProgram(name);
+};
+
+bufferQuad = function(glod) {
+  return glod.createVBO("quad").uploadCCWQuad("quad");
+};
+
+bufferCartesianSamples = function(glod, numSamples) {
+  var i, samplesArray, _i;
+  samplesArray = [];
+  for (i = _i = 0; 0 <= numSamples ? _i <= numSamples : _i >= numSamples; i = 0 <= numSamples ? ++_i : --_i) {
+    samplesArray.push(i);
+  }
+  if (glod.hasVBO("samples")) {
+    glod.deleteVBO("samples");
+  }
+  return glod.createVBO("samples").bufferDataStatic("samples", new Float32Array(samplesArray));
+};
+
+getTypeOfDraw = function(src) {
+  var matches, regex;
+  regex = /(float|vec2|vec3|vec4) +draw *\( *(float|vec2|vec3|vec4)/;
+  matches = regex.exec(src);
+  if (matches == null) {
+    return null;
+  }
+  return {
+    outputType: matches[1],
+    inputType: matches[2]
+  };
+};
+
+cartesian = {};
+
+cartesian.vertex = "precision highp float;\nprecision highp int;\n\nattribute float gg_sample;\n\nuniform float gg_start, gg_step;\nuniform vec2 gg_translate;\nuniform vec2 gg_scale;\n\n// INSERT\n\nvoid main() {\n  float x = gg_start + gg_step * gg_sample;\n  float y = draw(x);\n\n  vec2 position = (vec2(x, y) - gg_translate) / gg_scale;\n  gl_Position = vec4(position, 0., 1.);\n}";
+
+cartesian.fragment = "precision highp float;\nprecision highp int;\n\nvoid main() {\n  gl_FragColor = vec4(0., 0., 0.3, 1.);\n}";
+
+colorMap = {};
+
+colorMap.vertex = "precision highp float;\nprecision highp int;\n\nattribute vec4 gg_vertexPosition;\nuniform vec2 gg_translate;\nuniform vec2 gg_scale;\nvarying vec2 gg_position;\n\nvoid main() {\n  gl_Position = vec4(gg_vertexPosition);\n\n  gg_position = gg_vertexPosition.xy * gg_scale + gg_translate;\n}";
+
+colorMap.fragment = "precision highp float;\nprecision highp int;\n\nvarying vec2 gg_position;\n\n// INSERT\n\nvoid main() {\n  gl_FragColor = draw(gg_position);\n}";
+
+R.create("ShaderView", {
+  propTypes: {
+    src: String,
+    center: Array,
+    pixelSize: Number
+  },
+  render: function() {
+    return R.canvas({});
+  },
+  componentDidMount: function() {
+    this._init();
+    return this._draw();
+  },
+  componentDidUpdate: function() {
+    return this._draw();
+  },
+  shouldComponentUpdate: function(nextProps) {
+    return !_.isEqual(this.props, nextProps);
+  },
+  _init: function() {
+    var canvas, gl, rect;
+    canvas = this.getDOMNode();
+    rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    this._glod = new Glod();
+    this._glod.canvas(canvas, {
+      antialias: true
+    });
+    gl = this._glod.gl();
+    gl.enable(gl.SCISSOR_TEST);
+    gl.lineWidth(1.25);
+    bufferQuad(this._glod);
+    return bufferCartesianSamples(this._glod, 20000);
+  },
+  _draw: function() {
+    var type;
+    if (this.errors.length > 0) {
+      return;
+    }
+    type = getTypeOfDraw(this.src);
+    if (type == null) {
+      return;
+    }
+    if (type.inputType === "float" && type.outputType === "float") {
+      return this._drawCartesian();
+    } else if (type.inputType === "vec2" && type.outputType === "vec4") {
+      return this._drawColorMap();
+    }
+  },
+  _drawColorMap: function() {
+    var canvas, fragment, height, scale, translate, vertex, width;
+    vertex = colorMap.vertex;
+    fragment = colorMap.fragment;
+    this._createProgram(vertex, fragment);
+    canvas = this.getDOMNode();
+    width = canvas.width;
+    height = canvas.height;
+    translate = this.center;
+    scale = [(width / 2) * this.pixelSize, (height / 2) * this.pixelSize];
+    return this._glod.begin("program").pack("quad", "gg_vertexPosition").valuev("gg_translate", translate).valuev("gg_scale", scale).ready().triangles().drawArrays(0, 6).end();
+  },
+  _drawCartesian: function() {
+    var canvas, fragment, height, numSamples, scale, start, step, translate, vertex, width;
+    vertex = cartesian.vertex;
+    fragment = cartesian.fragment;
+    this._createProgram(vertex, fragment);
+    canvas = this.getDOMNode();
+    width = canvas.width;
+    height = canvas.height;
+    translate = this.center;
+    scale = [(width / 2) * this.pixelSize, (height / 2) * this.pixelSize];
+    start = this.center[0] - (width / 2) * this.pixelSize;
+    step = this.pixelSize * config.resolution;
+    numSamples = width / config.resolution;
+    return this._glod.begin("program").pack("samples", "gg_sample").valuev("gg_translate", translate).valuev("gg_scale", scale).value("gg_start", start).value("gg_step", step).ready().lineStrip().drawArrays(0, numSamples).end();
+  },
+  _createProgram: function(vertexSrc, fragmentSrc) {
+    var fragment, vertex;
+    vertex = vertexSrc.replace("// INSERT", this.src);
+    fragment = fragmentSrc.replace("// INSERT", this.src);
+    if (vertex !== this._lastVertex || fragment !== this._lastFragment) {
+      createProgramFromSrc(this._glod, "program", vertex, fragment);
+      this._lastVertex = vertex;
+      return this._lastFragment = fragment;
+    }
+  }
+});
+
+
+},{"./glsl/Glod":9}],9:[function(require,module,exports){
 'use strict';
 
 module.exports = Glod;
@@ -1049,500 +1539,10 @@ Glod.prototype.allocv = function(id, v, f) {
   return this;
 };
 
-},{}],7:[function(require,module,exports){
-var canvasBounds, clear, drawGrid, drawLine, getSpacing, lerp, ticks;
-
-R.create("GridView", {
-  propTypes: {
-    center: Array,
-    pixelSize: Number
-  },
-  render: function() {
-    return R.canvas({});
-  },
-  componentDidMount: function() {
-    return this._draw();
-  },
-  componentDidUpdate: function() {
-    return this._draw();
-  },
-  shouldComponentUpdate: function(nextProps) {
-    return !_.isEqual(this.props, nextProps);
-  },
-  _draw: function() {
-    var canvas, ctx, rect;
-    canvas = this.getDOMNode();
-    rect = canvas.getBoundingClientRect();
-    if (canvas.width !== rect.width || canvas.height !== rect.height) {
-      canvas.width = rect.width;
-      canvas.height = rect.height;
-    }
-    ctx = canvas.getContext("2d");
-    clear(ctx);
-    return drawGrid(ctx, this.center, this.pixelSize);
-  }
-});
-
-clear = function(ctx) {
-  var canvas;
-  canvas = ctx.canvas;
-  return ctx.clearRect(0, 0, canvas.width, canvas.height);
-};
-
-canvasBounds = function(ctx) {
-  var canvas;
-  canvas = ctx.canvas;
-  return {
-    cxMin: 0,
-    cxMax: canvas.width,
-    cyMin: canvas.height,
-    cyMax: 0,
-    width: canvas.width,
-    height: canvas.height
-  };
-};
-
-lerp = function(x, dMin, dMax, rMin, rMax) {
-  var ratio;
-  ratio = (x - dMin) / (dMax - dMin);
-  return ratio * (rMax - rMin) + rMin;
-};
-
-ticks = function(spacing, min, max) {
-  var first, last, x, _i, _results;
-  first = Math.ceil(min / spacing);
-  last = Math.floor(max / spacing);
-  _results = [];
-  for (x = _i = first; first <= last ? _i <= last : _i >= last; x = first <= last ? ++_i : --_i) {
-    _results.push(x * spacing);
-  }
-  return _results;
-};
-
-drawLine = function(ctx, _arg, _arg1) {
-  var x1, x2, y1, y2;
-  x1 = _arg[0], y1 = _arg[1];
-  x2 = _arg1[0], y2 = _arg1[1];
-  ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
-  return ctx.stroke();
-};
-
-getSpacing = function(pixelSize) {
-  var div, largeSpacing, minSpacing, smallSpacing, z;
-  minSpacing = pixelSize * config.minGridSpacing;
-
-  /*
-  need to determine:
-    largeSpacing = {1, 2, or 5} * 10^n
-    smallSpacing = divide largeSpacing by 4 (if 1 or 2) or 5 (if 5)
-  largeSpacing must be greater than minSpacing
-   */
-  div = 4;
-  largeSpacing = z = Math.pow(10, Math.ceil(Math.log(minSpacing) / Math.log(10)));
-  if (z / 5 > minSpacing) {
-    largeSpacing = z / 5;
-  } else if (z / 2 > minSpacing) {
-    largeSpacing = z / 2;
-    div = 5;
-  }
-  smallSpacing = largeSpacing / div;
-  return {
-    largeSpacing: largeSpacing,
-    smallSpacing: smallSpacing
-  };
-};
-
-drawGrid = function(ctx, center, pixelSize) {
-  var axesColor, axesOpacity, color, cx, cxMax, cxMin, cy, cyMax, cyMin, fromLocal, height, labelColor, labelDistance, labelOpacity, largeSpacing, majorColor, majorOpacity, minorColor, minorOpacity, smallSpacing, text, textHeight, toLocal, width, x, xMax, xMin, y, yMax, yMin, _i, _j, _k, _l, _len, _len1, _len2, _len3, _len4, _len5, _m, _n, _ref, _ref1, _ref10, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9;
-  _ref = canvasBounds(ctx), cxMin = _ref.cxMin, cxMax = _ref.cxMax, cyMin = _ref.cyMin, cyMax = _ref.cyMax, width = _ref.width, height = _ref.height;
-  xMin = center[0] - (width / 2) * pixelSize;
-  xMax = center[0] + (width / 2) * pixelSize;
-  yMin = center[1] - (height / 2) * pixelSize;
-  yMax = center[1] + (height / 2) * pixelSize;
-  _ref1 = canvasBounds(ctx), cxMin = _ref1.cxMin, cxMax = _ref1.cxMax, cyMin = _ref1.cyMin, cyMax = _ref1.cyMax, width = _ref1.width, height = _ref1.height;
-  _ref2 = getSpacing(pixelSize), largeSpacing = _ref2.largeSpacing, smallSpacing = _ref2.smallSpacing;
-  toLocal = function(_arg) {
-    var cx, cy;
-    cx = _arg[0], cy = _arg[1];
-    return [lerp(cx, cxMin, cxMax, xMin, xMax), lerp(cy, cyMin, cyMax, yMin, yMax)];
-  };
-  fromLocal = function(_arg) {
-    var x, y;
-    x = _arg[0], y = _arg[1];
-    return [lerp(x, xMin, xMax, cxMin, cxMax), lerp(y, yMin, yMax, cyMin, cyMax)];
-  };
-  labelDistance = 5;
-  color = config.gridColor;
-  minorOpacity = 0.075;
-  majorOpacity = 0.1;
-  axesOpacity = 0.25;
-  labelOpacity = 1.0;
-  textHeight = 12;
-  minorColor = "rgba(" + color + ", " + minorOpacity + ")";
-  majorColor = "rgba(" + color + ", " + majorOpacity + ")";
-  axesColor = "rgba(" + color + ", " + axesOpacity + ")";
-  labelColor = "rgba(" + color + ", " + labelOpacity + ")";
-  ctx.save();
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = minorColor;
-  _ref3 = ticks(smallSpacing, xMin, xMax);
-  for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
-    x = _ref3[_i];
-    drawLine(ctx, fromLocal([x, yMin]), fromLocal([x, yMax]));
-  }
-  _ref4 = ticks(smallSpacing, yMin, yMax);
-  for (_j = 0, _len1 = _ref4.length; _j < _len1; _j++) {
-    y = _ref4[_j];
-    drawLine(ctx, fromLocal([xMin, y]), fromLocal([xMax, y]));
-  }
-  ctx.strokeStyle = majorColor;
-  _ref5 = ticks(largeSpacing, xMin, xMax);
-  for (_k = 0, _len2 = _ref5.length; _k < _len2; _k++) {
-    x = _ref5[_k];
-    drawLine(ctx, fromLocal([x, yMin]), fromLocal([x, yMax]));
-  }
-  _ref6 = ticks(largeSpacing, yMin, yMax);
-  for (_l = 0, _len3 = _ref6.length; _l < _len3; _l++) {
-    y = _ref6[_l];
-    drawLine(ctx, fromLocal([xMin, y]), fromLocal([xMax, y]));
-  }
-  ctx.strokeStyle = axesColor;
-  drawLine(ctx, fromLocal([0, yMin]), fromLocal([0, yMax]));
-  drawLine(ctx, fromLocal([xMin, 0]), fromLocal([xMax, 0]));
-  ctx.font = "" + textHeight + "px verdana";
-  ctx.fillStyle = labelColor;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  _ref7 = ticks(largeSpacing, xMin, xMax);
-  for (_m = 0, _len4 = _ref7.length; _m < _len4; _m++) {
-    x = _ref7[_m];
-    if (x !== 0) {
-      text = parseFloat(x.toPrecision(12)).toString();
-      _ref8 = fromLocal([x, 0]), cx = _ref8[0], cy = _ref8[1];
-      if (cx < cxMax) {
-        cy += labelDistance;
-        if (cy < labelDistance) {
-          cy = labelDistance;
-        }
-        if (cy + textHeight + labelDistance > height) {
-          cy = height - labelDistance - textHeight;
-        }
-        ctx.fillText(text, cx, cy);
-      }
-    }
-  }
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  _ref9 = ticks(largeSpacing, yMin, yMax);
-  for (_n = 0, _len5 = _ref9.length; _n < _len5; _n++) {
-    y = _ref9[_n];
-    if (y !== 0) {
-      text = parseFloat(y.toPrecision(12)).toString();
-      _ref10 = fromLocal([0, y]), cx = _ref10[0], cy = _ref10[1];
-      if (cy > 0) {
-        cx += labelDistance;
-        if (cx < labelDistance) {
-          cx = labelDistance;
-        }
-        if (cx + ctx.measureText(text).width + labelDistance > width) {
-          cx = width - labelDistance - ctx.measureText(text).width;
-        }
-        ctx.fillText(text, cx, cy);
-      }
-    }
-  }
-  return ctx.restore();
-};
-
-
-},{}],8:[function(require,module,exports){
-var R, desugarPropType, key, value, _ref,
-  __hasProp = {}.hasOwnProperty;
-
-window.R = R = {};
-
-_ref = React.DOM;
-for (key in _ref) {
-  if (!__hasProp.call(_ref, key)) continue;
-  value = _ref[key];
-  R[key] = value;
-}
-
-R.cx = React.addons.classSet;
-
-R.UniversalMixin = {
-  ownerView: function() {
-    var _ref1;
-    return (_ref1 = this._owner) != null ? _ref1 : this.props.__owner__;
-  },
-  lookup: function(keyName) {
-    var _ref1, _ref2;
-    return (_ref1 = this[keyName]) != null ? _ref1 : (_ref2 = this.ownerView()) != null ? _ref2.lookup(keyName) : void 0;
-  },
-  lookupView: function(viewName) {
-    var _ref1;
-    if (this === viewName || this.viewName() === viewName) {
-      return this;
-    }
-    return (_ref1 = this.ownerView()) != null ? _ref1.lookupView(viewName) : void 0;
-  },
-  lookupViewWithKey: function(keyName) {
-    var _ref1;
-    if (this[keyName] != null) {
-      return this;
-    }
-    return (_ref1 = this.ownerView()) != null ? _ref1.lookupViewWithKey(keyName) : void 0;
-  },
-  setPropsOnSelf: function(nextProps) {
-    var propName, propValue, _results;
-    _results = [];
-    for (propName in nextProps) {
-      if (!__hasProp.call(nextProps, propName)) continue;
-      propValue = nextProps[propName];
-      if (propName === "__owner__") {
-        continue;
-      }
-      _results.push(this[propName] = propValue);
-    }
-    return _results;
-  },
-  componentWillMount: function() {
-    return this.setPropsOnSelf(this.props);
-  },
-  componentWillUpdate: function(nextProps) {
-    return this.setPropsOnSelf(nextProps);
-  },
-  componentDidMount: function() {
-    var el;
-    el = this.getDOMNode();
-    return el.dataFor != null ? el.dataFor : el.dataFor = this;
-  },
-  componentWillUnmount: function() {
-    var el;
-    el = this.getDOMNode();
-    return delete el.dataFor;
-  }
-};
-
-desugarPropType = function(propType, optional) {
-  var required;
-  if (optional == null) {
-    optional = false;
-  }
-  if (propType.optional) {
-    propType = propType.optional;
-    required = false;
-  } else if (optional) {
-    required = false;
-  } else {
-    required = true;
-  }
-  if (propType === Number) {
-    propType = React.PropTypes.number;
-  } else if (propType === String) {
-    propType = React.PropTypes.string;
-  } else if (propType === Boolean) {
-    propType = React.PropTypes.bool;
-  } else if (propType === Function) {
-    propType = React.PropTypes.func;
-  } else if (propType === Array) {
-    propType = React.PropTypes.array;
-  } else if (propType === Object) {
-    propType = React.PropTypes.object;
-  } else if (_.isArray(propType)) {
-    propType = React.PropTypes.any;
-  } else {
-    propType = React.PropTypes.instanceOf(propType);
-  }
-  if (required) {
-    propType = propType.isRequired;
-  }
-  return propType;
-};
-
-R.create = function(name, opts) {
-  var propName, propType, _ref1;
-  opts.displayName = name;
-  opts.viewName = function() {
-    return name;
-  };
-  if (opts.propTypes == null) {
-    opts.propTypes = {};
-  }
-  _ref1 = opts.propTypes;
-  for (propName in _ref1) {
-    if (!__hasProp.call(_ref1, propName)) continue;
-    propType = _ref1[propName];
-    opts.propTypes[propName] = desugarPropType(propType);
-  }
-  if (opts.mixins == null) {
-    opts.mixins = [];
-  }
-  opts.mixins.unshift(R.UniversalMixin);
-  return R[name] = React.createClass(opts);
-};
-
-require("./AppRootView");
-
-require("./CodeMirrorView");
-
-require("./ShaderView");
-
-require("./GridView");
-
-
-},{"./AppRootView":4,"./CodeMirrorView":5,"./GridView":7,"./ShaderView":9}],9:[function(require,module,exports){
-var Glod, bufferCartesianSamples, bufferQuad, cartesian, colorMap, createProgramFromSrc, getTypeOfDraw;
-
-Glod = require("./Glod");
-
-createProgramFromSrc = function(glod, name, vertex, fragment) {
-  Glod.preprocessed[name] = {
-    name: name,
-    fragment: fragment,
-    vertex: vertex
-  };
-  delete glod._programs[name];
-  return glod.createProgram(name);
-};
-
-bufferQuad = function(glod) {
-  return glod.createVBO("quad").uploadCCWQuad("quad");
-};
-
-bufferCartesianSamples = function(glod, numSamples) {
-  var i, samplesArray, _i;
-  samplesArray = [];
-  for (i = _i = 0; 0 <= numSamples ? _i <= numSamples : _i >= numSamples; i = 0 <= numSamples ? ++_i : --_i) {
-    samplesArray.push(i);
-  }
-  if (glod.hasVBO("samples")) {
-    glod.deleteVBO("samples");
-  }
-  return glod.createVBO("samples").bufferDataStatic("samples", new Float32Array(samplesArray));
-};
-
-getTypeOfDraw = function(src) {
-  var matches, regex;
-  regex = /(float|vec2|vec3|vec4) +draw *\( *(float|vec2|vec3|vec4)/;
-  matches = regex.exec(src);
-  if (matches == null) {
-    return null;
-  }
-  return {
-    outputType: matches[1],
-    inputType: matches[2]
-  };
-};
-
-cartesian = {};
-
-cartesian.vertex = "precision highp float;\nprecision highp int;\n\nattribute float gg_sample;\n\nuniform float gg_start, gg_step;\nuniform vec2 gg_translate;\nuniform vec2 gg_scale;\n\n// INSERT\n\nvoid main() {\n  float x = gg_start + gg_step * gg_sample;\n  float y = draw(x);\n\n  vec2 position = (vec2(x, y) - gg_translate) / gg_scale;\n  gl_Position = vec4(position, 0., 1.);\n}";
-
-cartesian.fragment = "precision highp float;\nprecision highp int;\n\nvoid main() {\n  gl_FragColor = vec4(0., 0., 0.3, 1.);\n}";
-
-colorMap = {};
-
-colorMap.vertex = "precision highp float;\nprecision highp int;\n\nattribute vec4 gg_vertexPosition;\nuniform vec2 gg_translate;\nuniform vec2 gg_scale;\nvarying vec2 gg_position;\n\nvoid main() {\n  gl_Position = vec4(gg_vertexPosition);\n\n  gg_position = gg_vertexPosition.xy * gg_scale + gg_translate;\n}";
-
-colorMap.fragment = "precision highp float;\nprecision highp int;\n\nvarying vec2 gg_position;\n\n// INSERT\n\nvoid main() {\n  gl_FragColor = draw(gg_position);\n}";
-
-R.create("ShaderView", {
-  propTypes: {
-    src: String,
-    center: Array,
-    pixelSize: Number
-  },
-  render: function() {
-    return R.canvas({});
-  },
-  componentDidMount: function() {
-    this._init();
-    return this._draw();
-  },
-  componentDidUpdate: function() {
-    return this._draw();
-  },
-  shouldComponentUpdate: function(nextProps) {
-    return !_.isEqual(this.props, nextProps);
-  },
-  _init: function() {
-    var canvas, gl, rect;
-    canvas = this.getDOMNode();
-    rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-    this._glod = new Glod();
-    this._glod.canvas(canvas, {
-      antialias: true
-    });
-    gl = this._glod.gl();
-    gl.enable(gl.SCISSOR_TEST);
-    gl.lineWidth(1.25);
-    bufferQuad(this._glod);
-    return bufferCartesianSamples(this._glod, 20000);
-  },
-  _draw: function() {
-    var type;
-    if (this.errors.length > 0) {
-      return;
-    }
-    type = getTypeOfDraw(this.src);
-    if (type == null) {
-      return;
-    }
-    if (type.inputType === "float" && type.outputType === "float") {
-      return this._drawCartesian();
-    } else if (type.inputType === "vec2" && type.outputType === "vec4") {
-      return this._drawColorMap();
-    }
-  },
-  _drawColorMap: function() {
-    var canvas, fragment, height, scale, translate, vertex, width;
-    vertex = colorMap.vertex;
-    fragment = colorMap.fragment;
-    this._createProgram(vertex, fragment);
-    canvas = this.getDOMNode();
-    width = canvas.width;
-    height = canvas.height;
-    translate = this.center;
-    scale = [(width / 2) * this.pixelSize, (height / 2) * this.pixelSize];
-    return this._glod.begin("program").pack("quad", "gg_vertexPosition").valuev("gg_translate", translate).valuev("gg_scale", scale).ready().triangles().drawArrays(0, 6).end();
-  },
-  _drawCartesian: function() {
-    var canvas, fragment, height, numSamples, scale, start, step, translate, vertex, width;
-    vertex = cartesian.vertex;
-    fragment = cartesian.fragment;
-    this._createProgram(vertex, fragment);
-    canvas = this.getDOMNode();
-    width = canvas.width;
-    height = canvas.height;
-    translate = this.center;
-    scale = [(width / 2) * this.pixelSize, (height / 2) * this.pixelSize];
-    start = this.center[0] - (width / 2) * this.pixelSize;
-    step = this.pixelSize * config.resolution;
-    numSamples = width / config.resolution;
-    return this._glod.begin("program").pack("samples", "gg_sample").valuev("gg_translate", translate).valuev("gg_scale", scale).value("gg_start", start).value("gg_step", step).ready().lineStrip().drawArrays(0, numSamples).end();
-  },
-  _createProgram: function(vertexSrc, fragmentSrc) {
-    var fragment, vertex;
-    vertex = vertexSrc.replace("// INSERT", this.src);
-    fragment = fragmentSrc.replace("// INSERT", this.src);
-    if (vertex !== this._lastVertex || fragment !== this._lastFragment) {
-      createProgramFromSrc(this._glod, "program", vertex, fragment);
-      this._lastVertex = vertex;
-      return this._lastFragment = fragment;
-    }
-  }
-});
-
-
-},{"./Glod":6}],10:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 var Glod, canvas, createProgramFromSrc, fragmentSrc, glod, glslCheckError, glslParseError, vertexSrc;
 
-Glod = require("../Glod");
+Glod = require("./Glod");
 
 glslParseError = require("./glslParseError");
 
@@ -1587,7 +1587,7 @@ module.exports = glslCheckError = function(src) {
 };
 
 
-},{"../Glod":6,"./glslParseError":11}],11:[function(require,module,exports){
+},{"./Glod":9,"./glslParseError":11}],11:[function(require,module,exports){
 var errorRegex = /ERROR: *(\d+):(\d+):(.*)/;
 
 module.exports = function glslParseError(err) {

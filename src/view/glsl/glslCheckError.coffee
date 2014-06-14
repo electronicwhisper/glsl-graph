@@ -1,4 +1,4 @@
-Glod = require("../Glod")
+Glod = require("./Glod")
 glslParseError = require("./glslParseError")
 
 createProgramFromSrc = (glod, name, vertex, fragment) ->
